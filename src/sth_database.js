@@ -882,15 +882,15 @@
    * @param {string} collection The collection where the data should be stored
    * @param {string} entityId The entity id
    * @param {string} entityType The entity type
-   * @param {string} attrName The attribute id
-   * @param {string} attrType The attribute type
+   * @param {object} attrName The attribute name
+   * @param {object} attrType The attribute type
+   * @param {object} attrValue The attribute value
    * @param {string} resolution The resolution
-   * @param {Date} recvTime The date the event arrived
+   * @param {Date} timestamp The attribute value timestamp
    * @param {Function} callback Function to call once the operation completes
    */
   function storeAggregatedData4Resolution(
-    collection, entityId, entityType, attrName, attrType, attrValue,
-    resolution, recvTime, callback) {
+    collection, entityId, entityType, attrName, attrType, attrValue, resolution, timestamp, callback) {
     /*
      Currently the MongoDB $ positional update operator cannot be combined with upserts
       (see http://docs.mongodb.org/manual/reference/operator/update/positional/#upsert).
@@ -900,7 +900,7 @@
       collection.update(
         // Returning all the update operators currently returned by getAggregateUpdate4Insert
         //  and getAggregateUpdate4Update in the same object
-        getAggregateUpdateCondition(entityId, entityType, attrName, resolution, recvTime),
+        getAggregateUpdateCondition(entityId, entityType, attrName, resolution, timestamp),
         getAggregateUpdate(attrValue),
         {
           upsert: true,
@@ -917,7 +917,7 @@
     //  origin and resolution.
     collection.update(
       getAggregateUpdateCondition(
-        entityId, entityType, attrName, resolution, recvTime),
+        entityId, entityType, attrName, resolution, timestamp),
       getAggregateUpdate4Insert(attrType, attrValue, resolution),
       {
         upsert: true,
@@ -933,8 +933,8 @@
         //  aggregate the new value received.
         collection.update(
           getAggregateUpdateCondition(
-            entityId, entityType, attrName, resolution, recvTime),
-          getAggregateUpdate4Update(attrType, attrValue, resolution, recvTime),
+            entityId, entityType, attrName, resolution, timestamp),
+          getAggregateUpdate4Update(attrType, attrValue, resolution, timestamp),
           {
             writeConcern: {
               w: !isNaN(sthConfig.WRITE_CONCERN) ? parseInt(sthConfig.WRITE_CONCERN) : sthConfig.WRITE_CONCERN
@@ -956,13 +956,11 @@
    * @param {Date} recvTime The date the event arrived
    * @param {string} entityId The entity id associated to updated attribute
    * @param {string} entityType The entity type associated to the updated attribute
-   * @param {string} attrName The updated attribute id
-   * @param {string} attrType The updated attribute type
-   * @param {string} attrValue The updated attribute value
+   * @param {string} attribute The updated attribute
    * @param {Function} callback Function to call once the operation completes
    */
   function storeAggregatedData(
-    collection, recvTime, servicePath, entityId, entityType, attrName, attrType, attrValue, callback) {
+    collection, recvTime, servicePath, entityId, entityType, attribute, callback) {
     var counter = 0,
         error;
     function onCompletion(err) {
@@ -972,10 +970,12 @@
       }
     }
 
+    var timestamp = sthHelper.getAttributeTimestamp(attribute, recvTime);
+
     sthConfig.AGGREGATION.forEach(function(entry) {
       storeAggregatedData4Resolution(
-        collection, entityId, entityType, attrName, attrType, attrValue,
-        entry, recvTime, onCompletion);
+        collection, entityId, entityType, attribute.name, attribute.type, attribute.value,
+        entry, timestamp, onCompletion);
     });
   }
 
@@ -985,39 +985,38 @@
    * @param {Date} recvTime The date the event arrived
    * @param {string} entityId The entity id associated to updated attribute
    * @param {string} entityType The entity type associated to the updated attribute
-   * @param {string} attrName The updated attribute id
-   * @param {string} attrType The updated attribute type
-   * @param {string} attrValue The updated attribute value
+   * @param {object} attribute The updated attribute id
    * @param {Function} callback Function to call once the operation completes
    */
   function storeRawData(
-    collection, recvTime, servicePath, entityId, entityType, attrName,
-    attrType, attrValue, callback) {
+    collection, recvTime, servicePath, entityId, entityType, attribute, callback) {
+    var timestamp = sthHelper.getAttributeTimestamp(attribute, recvTime);
+
     var theEvent;
     switch (DATA_MODEL) {
       case DATA_MODELS.COLLECTIONS_PER_SERVICE_PATH:
         theEvent = {
-          recvTime: recvTime,
+          recvTime: timestamp,
           entityId: entityId,
           entityType: entityType,
-          attrName: attrName,
-          attrType: attrType,
-          attrValue: attrValue
+          attrName: attribute.name,
+          attrType: attribute.type,
+          attrValue: attribute.value
         };
         break;
       case DATA_MODELS.COLLECTIONS_PER_ENTITY:
         theEvent = {
-          recvTime: recvTime,
-          attrName: attrName,
-          attrType: attrType,
-          attrValue: attrValue
+          recvTime: timestamp,
+          attrName: attribute.name,
+          attrType: attribute.type,
+          attrValue: attribute.value
         };
         break;
       case DATA_MODELS.COLLECTIONS_PER_ATTRIBUTE:
         theEvent = {
-          recvTime: recvTime,
-          attrType: attrType,
-          attrValue: attrValue
+          recvTime: timestamp,
+          attrType: attribute.type,
+          attrValue: attribute.value
         };
         break;
     }

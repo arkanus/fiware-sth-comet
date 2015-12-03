@@ -300,9 +300,7 @@
                 servicePath,
                 contextElement.id,
                 contextElement.type,
-                attribute.name,
-                attribute.type,
-                attribute.value,
+                attribute,
                 function (err) {
                   if (err) {
                     sthLogger.error(
@@ -376,9 +374,7 @@
                 servicePath,
                 contextElement.id,
                 contextElement.type,
-                attribute.name,
-                attribute.type,
-                attribute.value,
+                attribute,
                 function (err) {
                   if (err) {
                     sthLogger.error(
